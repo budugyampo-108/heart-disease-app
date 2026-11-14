@@ -2,7 +2,7 @@
   "version": 2,
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/main.py" },
-    { "src": "/", "dest": "web/index.html" },
-    { "src": "/(.*)", "dest": "web/$1" }
+    { "src": "/", "dest": "heart-disease-app/web/index.html" },
+    { "src": "/(.*)", "dest": "heart-disease-app/web/$1" }
   ]
 }
