@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vercel/
+.DS_Store
+# model.pkl and metrics.json are NOT ignored: Vercel needs them in the repo.

@@ -1,0 +1,10 @@
+# Runtime dependencies (installed by Vercel and used by backend/main.py).
+# scikit-learn is pinned to the exact version that trained model.pkl: a pickle
+# made with one version can fail to load on another. If you re-train with a
+# different version, update this line to match `sklearn_version` in metrics.json.
+fastapi>=0.115
+pydantic>=2.7
+scikit-learn==1.9.1
+pandas>=2.2
+numpy>=1.26
+joblib>=1.4

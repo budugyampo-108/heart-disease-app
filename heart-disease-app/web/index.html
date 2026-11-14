@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CardioScope - Heart disease risk screening</title>
+<meta name="description" content="Estimate a patient's probability of heart disease from clinical measurements, and see how well the model performs.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230C2536'/%3E%3Cpath d='M3 17h6l3-7 5 13 3-9 2 3h7' fill='none' stroke='%238EE3D8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================================
+   Design tokens
+   ========================================================================== */
+:root {
+  --ink: #0E2A3B;          /* primary text */
+  --ink-2: #3C5668;        /* secondary text */
+  --muted: #567080;        /* captions, hints */
+  --paper: #EDF2F5;        /* page background */
+  --surface: #FFFFFF;      /* panels */
+  --line: #D6E1E8;        /* borders */
+  --line-2: #E6EDF1;      /* quiet dividers */
+  --navy: #0C2536;         /* hero band */
+
+  --brand: #0F7F86;        /* controls, chart marks */
+  --brand-dark: #0A5C63;
+  --brand-tint: #E2F1F2;
+
+  /* Risk states. Always paired with an icon and a word, never colour alone. */
+  --low: #17714A;  --low-bg: #E3F4EB;
+  --mod: #8A5A0B;  --mod-bg: #FBEFD6;
+  --high: #B3243F; --high-bg: #FCE5EA;
+
+  --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 16px/1.55 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, dl, dd, figure { margin: 0; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid rgba(15,127,134,.45); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { width: min(1180px, 100% - 40px); margin-inline: auto; }
+.skip { position: absolute; left: 12px; top: -48px; background: #fff; padding: 8px 14px; border-radius: 8px; z-index: 50; }
+.skip:focus { top: 12px; }
+.num-t { font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Hero (navy band with the ECG trace)
+   ========================================================================== */
+.hero { background: var(--navy); color: #fff; padding-bottom: 96px; }
+.nav { display: flex; align-items: center; gap: 28px; padding: 22px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--font-display); letter-spacing: -.01em; color: #fff; text-decoration: none; }
+.brand svg { width: 30px; height: 30px; }
+.nav-links { display: flex; gap: 22px; margin-left: 12px; }
+.nav-links a { color: #B9CBD6; text-decoration: none; font-weight: 500; font-size: 15px; }
+.nav-links a:hover { color: #fff; }
+.pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 14px; color: #D6E4EC; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: #7C8F9C; }
+.pill.ok i { background: #5FD3A0; }
+.pill.bad i { background: #FF8FA3; }
+
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: center; padding-top: 28px; }
+.hero h1 { font: 700 clamp(38px, 5.2vw, 62px)/1.02 var(--font-display); letter-spacing: -.025em; font-variation-settings: "opsz" 72; max-width: 12ch; }
+.hero-copy p { margin-top: 20px; max-width: 46ch; color: #C3D3DD; font-size: 18px; line-height: 1.55; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 22px; border-radius: 12px; border: 1px solid transparent; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: #8EE3D8; color: #06323A; }
+.btn-primary:hover { background: #A6EDE3; }
+.btn-ghost { border-color: rgba(255,255,255,.28); color: #fff; }
+.btn-ghost:hover { background: rgba(255,255,255,.08); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 36px; }
+.facts div { display: flex; flex-direction: column; }
+.facts dt { font-size: 14px; color: #8FA7B6; order: 2; }
+.facts dd { font: 700 22px/1.2 var(--font-display); color: #fff; }
+
+.ecg-card { position: relative; border-radius: 22px; background: linear-gradient(180deg, #0F2E42, #0A2030); border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
+#ecg { display: block; width: 100%; height: 260px; }
+.ecg-card figcaption { padding: 0 20px 16px; font-size: 13px; color: #8FA7B6; display: flex; justify-content: space-between; gap: 12px; }
+.ecg-card figcaption b { color: #D6E4EC; font-weight: 600; }
+
+/* ==========================================================================
+   Panels and layout
+   ========================================================================== */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
+.panel h2 { font: 700 24px/1.2 var(--font-display); letter-spacing: -.01em; }
+.panel .sub { color: var(--ink-2); margin-top: 6px; font-size: 15px; }
+
+.predict-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; margin-top: -64px; position: relative; align-items: start; }
+.result-panel { position: sticky; top: 16px; }
+
+.banner { display: none; margin-bottom: 18px; padding: 12px 16px; border-radius: 12px; background: var(--high-bg); color: #7A1428; font-size: 15px; }
+.banner.show { display: block; }
+.banner code { background: rgba(255,255,255,.7); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
+
+/* ----- Form ----- */
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: 14px; font-weight: 500; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.chip:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-tint); }
+.group { margin-top: 28px; }
+.group h3 { font: 700 15px/1.3 var(--font-display); color: var(--ink-2); padding-bottom: 10px; border-bottom: 1px solid var(--line-2); margin-bottom: 4px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 36px; }
+.field { padding: 14px 0 4px; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field label, .field .lbl { font-weight: 600; font-size: 15px; }
+.numbox { display: inline-flex; align-items: baseline; gap: 6px; }
+.numbox input { width: 74px; padding: 5px 8px; text-align: right; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+.numbox input:focus { border-color: var(--brand); }
+.numbox em { font-style: normal; color: var(--muted); font-size: 13px; min-width: 0; }
+.range-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; margin-top: 0; font-variant-numeric: tabular-nums; }
+.field.full { grid-column: 1 / -1; }
+
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 4px 0 0; --pct: 50%; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 6px; background: linear-gradient(to right, var(--brand) var(--pct), var(--line) var(--pct)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: #fff; border: 2px solid var(--brand); box-shadow: 0 1px 4px rgba(14,42,59,.3); transition: transform .12s; }
+input[type=range]:active::-webkit-slider-thumb { transform: scale(1.12); }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 6px; background: var(--line); }
+input[type=range]::-moz-range-progress { height: 6px; border-radius: 6px; background: var(--brand); }
+input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--brand); box-shadow: 0 1px 4px rgba(14,42,59,.3); }
+input[type=range]:focus-visible { outline: none; }
+input[type=range]:focus-visible::-webkit-slider-thumb { outline: 3px solid rgba(15,127,134,.4); outline-offset: 2px; }
+input[type=range]:focus-visible::-moz-range-thumb { outline: 3px solid rgba(15,127,134,.4); outline-offset: 2px; }
+
+.seg { display: inline-flex; margin-top: 8px; padding: 3px; border-radius: 11px; background: var(--paper); border: 1px solid var(--line-2); }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg span { display: block; padding: 7px 18px; border-radius: 8px; font-weight: 600; font-size: 14.5px; color: var(--ink-2); transition: background .15s, color .15s; }
+.seg input:checked + span { background: #fff; color: var(--brand-dark); box-shadow: 0 1px 3px rgba(14,42,59,.18); }
+.seg input:focus-visible + span { outline: 3px solid rgba(15,127,134,.45); outline-offset: 1px; }
+
+.submit-row { display: flex; align-items: center; gap: 16px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line-2); }
+.btn-solid { background: var(--brand); color: #fff; }
+.btn-solid:hover { background: var(--brand-dark); }
+.submit-row small { color: var(--muted); font-size: 13.5px; }
+
+/* ----- Result ----- */
+.gauge { display: block; width: 100%; max-width: 330px; margin: 10px auto 0; overflow: visible; }
+.g-track { fill: none; stroke: var(--line-2); stroke-width: 16; }
+.g-fill { fill: none; stroke: var(--mod); stroke-width: 16; transition: stroke-dasharray .6s cubic-bezier(.2,.8,.2,1), stroke .3s; }
+.g-tick { stroke: var(--surface); stroke-width: 3; }
+.g-num { font: 700 42px/1 var(--font-display); fill: var(--ink); text-anchor: middle; font-variant-numeric: tabular-nums; }
+.g-cap { font: 500 12.5px var(--font-body); fill: var(--muted); text-anchor: middle; }
+.risk { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; margin-top: 4px; }
+.risk-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px; font: 700 15.5px/1 var(--font-display); }
+.risk-chip svg { width: 18px; height: 18px; }
+.risk-chip.low { background: var(--low-bg); color: var(--low); }
+.risk-chip.moderate { background: var(--mod-bg); color: var(--mod); }
+.risk-chip.high { background: var(--high-bg); color: var(--high); }
+.risk p { color: var(--ink-2); font-size: 15px; max-width: 36ch; }
+.breakdown { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line-2); display: grid; gap: 14px; }
+.bar-row .bar-top { display: flex; justify-content: space-between; font-size: 14.5px; margin-bottom: 6px; }
+.bar-row .bar-top b { font-variant-numeric: tabular-nums; }
+.bar { height: 10px; border-radius: 6px; background: var(--line-2); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 0 5px 5px 0; background: var(--brand); width: 0; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.bar.alt i { background: #5E7A8C; }
+.verdict { margin-top: 18px; font-size: 14.5px; color: var(--ink-2); }
+.verdict b { color: var(--ink); }
+.caution { margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--mod-bg); color: #5E3D05; font-size: 14px; display: none; }
+.caution.show { display: block; }
+.fine { margin-top: 16px; font-size: 13px; color: var(--muted); }
+.result-panel.busy .g-num { opacity: .55; }
+.err { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--high-bg); color: #7A1428; font-size: 14.5px; }
+.err.show { display: block; }
+
+/* ==========================================================================
+   Performance section
+   ========================================================================== */
+.section-head { margin: 72px 0 24px; }
+.section-head h2 { font: 700 clamp(28px, 3.4vw, 38px)/1.1 var(--font-display); letter-spacing: -.02em; }
+.section-head p { margin-top: 10px; color: var(--ink-2); max-width: 62ch; }
+
+.metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.metric { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px; }
+.metric h3 { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+.metric .val { font: 700 36px/1.1 var(--font-display); letter-spacing: -.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.metric .bar { margin-top: 12px; }
+.metric p { margin-top: 12px; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+
+.note { margin-top: 16px; padding: 16px 20px; border-radius: 16px; background: var(--mod-bg); color: #4F3304; display: none; gap: 14px; }
+.note.show { display: flex; }
+.note svg { flex: none; width: 22px; height: 22px; margin-top: 2px; color: var(--mod); }
+.note b { display: block; margin-bottom: 2px; }
+.note p { font-size: 15px; }
+
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.chart-title { display: flex; flex-direction: column; margin-bottom: 18px; }
+
+/* Confusion matrix */
+table.cm { width: 100%; border-collapse: separate; border-spacing: 6px; table-layout: fixed; }
+.cm th { font-weight: 600; font-size: 13.5px; color: var(--ink-2); padding: 4px; }
+.cm thead th { text-align: center; }
+.cm tbody th { text-align: right; width: 76px; padding-right: 8px; line-height: 1.25; }
+.cm td { padding: 0; }
+.cell { width: 100%; min-height: 128px; border: 0; border-radius: 14px; padding: 12px 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .12s, box-shadow .12s; }
+.cell:hover, .cell.on { transform: translateY(-2px); box-shadow: 0 0 0 2px var(--ink); }
+.cell .n { font: 700 38px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.cell .k { font-weight: 600; font-size: 14px; }
+.cell .p { font-size: 12.5px; opacity: .85; }
+.cm-detail { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--paper); font-size: 15px; min-height: 76px; }
+
+/* ROC */
+.roc { width: 100%; height: auto; display: block; touch-action: none; }
+.roc text { font: 500 12px var(--font-body); fill: var(--muted); }
+.roc .axis-t { font-weight: 600; fill: var(--ink-2); font-size: 12.5px; }
+.roc .grid { stroke: var(--line-2); stroke-width: 1; }
+.roc .curve { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; }
+.roc .area { fill: var(--brand-tint); opacity: .75; }
+.roc .diag { stroke: #8AA0AE; stroke-width: 1.5; stroke-dasharray: 5 5; }
+.roc .auc { font: 700 15px var(--font-display); fill: var(--brand-dark); }
+
+/* Importance */
+.imp { display: grid; gap: 12px; }
+.imp-row { display: grid; grid-template-columns: 138px 1fr 52px; gap: 12px; align-items: center; font-size: 14.5px; }
+.imp-row .bar { height: 9px; background: transparent; }
+.imp-row .bar i { background: var(--brand); border-radius: 0 4px 4px 0; }
+.imp-row b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Model details */
+.details { display: grid; gap: 0; }
+.details div { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line-2); font-size: 15px; }
+.details div:last-child { border-bottom: 0; }
+.details dt { color: var(--ink-2); }
+.details dd { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.cand { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 14.5px; }
+.cand th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.cand td { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-variant-numeric: tabular-nums; }
+.cand th:last-child, .cand td:last-child { text-align: right; }
+.tag { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; background: var(--brand-tint); color: var(--brand-dark); font-size: 12.5px; font-weight: 600; }
+
+.empty { padding: 28px; border: 1px dashed var(--line); border-radius: 16px; color: var(--ink-2); background: #fff; }
+.empty code { background: var(--paper); padding: 2px 7px; border-radius: 6px; }
+
+footer { margin-top: 72px; padding: 28px 0 44px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+footer a { color: var(--brand-dark); }
+
+/* Tooltip (shared by the ROC curve) */
+.tip { position: fixed; z-index: 40; pointer-events: none; padding: 9px 12px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 13.5px; line-height: 1.45; box-shadow: 0 6px 18px rgba(14,42,59,.3); }
+.tip[hidden] { display: none; }
+.tip b { font-weight: 600; color: #A9D9D6; }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 1060px) {
+  .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 920px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .hero h1 { max-width: 16ch; }
+  #ecg { height: 200px; }
+  .predict-grid { grid-template-columns: 1fr; margin-top: -48px; }
+  .result-panel { position: static; order: -1; }
+  .charts { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .hero { padding-bottom: 80px; }
+  .panel { padding: 20px; border-radius: 18px; }
+  .fields { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric:last-child { grid-column: 1 / -1; }
+  .imp-row { grid-template-columns: 112px 1fr 46px; gap: 8px; font-size: 14px; }
+  .cell { min-height: 104px; }
+  .cell .n { font-size: 30px; }
+  .cm tbody th { width: 56px; font-size: 12.5px; }
+  .submit-row { flex-direction: column; align-items: stretch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+
+<body>
+<a class="skip" href="#predict">Skip to the prediction form</a>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero">
+  <div class="wrap">
+    <nav class="nav" aria-label="Main">
+      <a class="brand" href="#">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#8EE3D8"/><path d="M4 17h6l3-7 5 13 3-9 2 3h5" fill="none" stroke="#06323A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        CardioScope
+      </a>
+      <div class="nav-links">
+        <a href="#predict">Predict</a>
+        <a href="#performance">Model performance</a>
+        <a href="/api/docs" id="docsLink">API docs</a>
+      </div>
+      <span class="pill" id="apiPill" role="status"><i></i><span>Connecting</span></span>
+    </nav>
+
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <h1>Heart disease risk screening</h1>
+        <p id="heroText">Enter a patient's clinical measurements and get the model's estimated probability of heart disease.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#predict">Estimate a patient's risk</a>
+          <a class="btn btn-ghost" href="#performance">See model performance</a>
+        </div>
+        <dl class="facts" id="facts" hidden></dl>
+      </div>
+
+      <figure class="ecg-card">
+        <canvas id="ecg" aria-hidden="true"></canvas>
+        <figcaption><span><b id="ecgState">Resting rhythm</b></span><span>Illustration only, not a measurement</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ======================= PREDICT ======================= -->
+<section id="predict" class="wrap predict-grid" aria-label="Prediction">
+  <div class="panel">
+    <h2>Patient details</h2>
+    <p class="sub">Move a slider or type a value. The estimate updates as you go.</p>
+    <div class="banner" id="apiBanner" role="alert"></div>
+    <div class="presets" role="group" aria-label="Example patients">
+      <button type="button" class="chip" data-preset="low">Lower-risk example</button>
+      <button type="button" class="chip" data-preset="high">Higher-risk example</button>
+      <button type="button" class="chip" data-preset="avg">Reset to averages</button>
+    </div>
+    <form id="form" novalidate>
+      <div id="formBody"></div>
+      <div class="submit-row">
+        <button type="submit" class="btn btn-solid">Estimate risk</button>
+        <small>For education only. Not a medical diagnosis.</small>
+      </div>
+    </form>
+  </div>
+
+  <aside class="panel result-panel" id="resultPanel" aria-live="polite" aria-label="Prediction result">
+    <h2>Estimated risk</h2>
+    <svg class="gauge" viewBox="0 0 220 134" role="img" aria-label="Probability gauge">
+      <path class="g-track" d="M20 112 A90 90 0 0 1 200 112" pathLength="100"/>
+      <path class="g-fill" id="gFill" d="M20 112 A90 90 0 0 1 200 112" pathLength="100" stroke-dasharray="0 100"/>
+      <line class="g-tick" x1="64.15" y1="48.9" x2="50.05" y2="29.48"/>
+      <line class="g-tick" x1="134.1" y1="37.81" x2="141.52" y2="14.99"/>
+      <text class="g-num" id="gNum" x="110" y="98">-</text>
+      <text class="g-cap" x="110" y="126">chance of heart disease</text>
+    </svg>
+    <div class="risk">
+      <span class="risk-chip moderate" id="riskChip"></span>
+      <p id="riskText">Adjust the patient details to see an estimate.</p>
+    </div>
+    <div class="breakdown">
+      <div class="bar-row">
+        <div class="bar-top"><span>No heart disease</span><b id="pNo">-</b></div>
+        <div class="bar alt"><i id="bNo"></i></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-top"><span>Heart disease</span><b id="pYes">-</b></div>
+        <div class="bar"><i id="bYes"></i></div>
+      </div>
+    </div>
+    <p class="verdict" id="verdict"></p>
+    <div class="caution" id="resultCaution"></div>
+    <div class="err" id="resultErr" role="alert"></div>
+    <p class="fine">Risk bands: low below 30%, moderate 30 to 60%, high above 60%. The class prediction uses a 50% cut-off.</p>
+  </aside>
+</section>
+
+<!-- ======================= PERFORMANCE ======================= -->
+<section id="performance" class="wrap" aria-labelledby="perfTitle">
+  <div class="section-head">
+    <h2 id="perfTitle">How well the model performs</h2>
+    <p id="perfSub">Scores are measured on patients the model never saw while it was being trained.</p>
+  </div>
+  <div id="perfBody"><div class="empty">Loading model results...</div></div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Educational project. The model learns from a synthetic hospital dataset and is not medical advice.</span>
+    <span><a href="/api/docs" id="docsLink2">Open the API documentation</a></span>
+  </div>
+</footer>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+/* ==========================================================================
+   1. Setup and helpers
+   ========================================================================== */
+// Where the API lives. Same origin by default (Vercel and `uvicorn backend.main:app`).
+// If you open this file straight from disk, it talks to a local server instead.
+// You can also force one with  ?api=https://your-api.example.com/api
+const API = (() => {
+  const forced = new URLSearchParams(location.search).get('api');
+  if (forced) return forced.replace(/\/$/, '');
+  return location.protocol === 'file:' ? 'http://localhost:8000/api' : '/api';
+})();
+const API_ORIGIN = API.replace(/\/api$/, '');
+document.getElementById('docsLink').href = API + '/docs';
+document.getElementById('docsLink2').href = API + '/docs';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const LABELS = {
+  age: 'Age', sex: 'Sex', blood_pressure: 'Blood pressure', cholesterol: 'Cholesterol', bmi: 'BMI',
+  smoker: 'Smoker', diabetes: 'Diabetes', physical_activity: 'Physical activity',
+  family_history: 'Family history', stress_level: 'Stress level',
+};
+const UNITS = { age: 'years', blood_pressure: 'mmHg', cholesterol: 'mg/dL', bmi: 'kg/m²' };
+const GROUPS = [
+  { title: 'Measurements', fields: ['age', 'blood_pressure', 'cholesterol', 'bmi'] },
+  { title: 'Lifestyle', fields: ['physical_activity', 'stress_level', 'smoker'] },
+  { title: 'Background', fields: ['sex', 'diabetes', 'family_history'] },
+];
+const nice = (k) => LABELS[k] || k.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+
+// Used only if /api/metrics cannot be reached, so the form still renders.
+const FALLBACK_SCHEMA = {
+  features: ['age', 'sex', 'blood_pressure', 'cholesterol', 'bmi', 'smoker', 'diabetes', 'physical_activity', 'family_history', 'stress_level'],
+  numeric: {
+    age: { min: 30, max: 79, mean: 55, step: 1 },
+    blood_pressure: { min: 90, max: 179, mean: 133, step: 1 },
+    cholesterol: { min: 150, max: 299, mean: 221, step: 1 },
+    bmi: { min: 18, max: 40, mean: 29, step: 0.1 },
+    physical_activity: { min: 0, max: 4, mean: 2, step: 1 },
+    stress_level: { min: 1, max: 9, mean: 5, step: 1 },
+  },
+  categorical: { sex: ['Female', 'Male'], smoker: ['No', 'Yes'], diabetes: ['No', 'Yes'], family_history: ['No', 'Yes'] },
+};
+
+const state = { metrics: null, schema: null, values: {}, seq: 0, timer: null };
+
+function mix(c1, c2, t) {            // blend two #rrggbb colours
+  const a = [1, 3, 5].map(i => parseInt(c1.slice(i, i + 2), 16));
+  const b = [1, 3, 5].map(i => parseInt(c2.slice(i, i + 2), 16));
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function tween(node, from, to, format, ms = 450) {
+  if (reduceMotion) { node.textContent = format(to); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    node.textContent = format(from + (to - from) * e);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/* ==========================================================================
+   2. ECG trace in the hero (speeds up as predicted risk rises)
+   ========================================================================== */
+const ecg = (() => {
+  const cv = $('#ecg'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1;
+  let risk = 0.3, shownRisk = 0.3, phase = 0, last = performance.now();
+
+  const gauss = (t, c, s, a) => a * Math.exp(-((t - c) ** 2) / (2 * s * s));
+  // One heartbeat (P, Q, R, S and T waves) for t in [0, 1). `st` lowers the ST segment.
+  function beat(t, st) {
+    let y = gauss(t, .12, .028, .14) + gauss(t, .255, .009, -.13) + gauss(t, .285, .010, 1)
+          + gauss(t, .315, .011, -.28) + gauss(t, .58, .05, .30);
+    if (t > .33 && t < .52) y -= st * Math.sin(Math.PI * (t - .33) / .19);
+    return y;
+  }
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // faint ECG paper grid
+    ctx.strokeStyle = 'rgba(255,255,255,.055)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0; x < W; x += 26) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+    for (let y = 0; y < H; y += 26) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+
+    const base = H * 0.64, amp = H * 0.46, beatW = Math.max(150, W / 2.6);
+    const st = Math.max(0, shownRisk - 0.35) * 0.5;
+    const yAt = (x) => base - beat((((x / beatW) + phase) % 1 + 1) % 1, st) * amp;
+
+    const calm = [142, 227, 216], hot = [255, 157, 175];
+    const k = Math.min(1, Math.max(0, (shownRisk - 0.3) / 0.4));
+    const col = calm.map((v, i) => Math.round(v + (hot[i] - v) * k)).join(',');
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, `rgba(${col},0)`); grad.addColorStop(.55, `rgba(${col},.75)`); grad.addColorStop(1, `rgba(${col},1)`);
+    ctx.strokeStyle = grad; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let x = 0; x <= W; x += 2) { x ? ctx.lineTo(x, yAt(x)) : ctx.moveTo(x, yAt(x)); }
+    ctx.stroke();
+
+    // glowing head at the right edge
+    const hy = yAt(W);
+    ctx.fillStyle = `rgba(${col},.25)`; ctx.beginPath(); ctx.arc(W - 3, hy, 9, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(W - 3, hy, 3.5, 0, 7); ctx.fill();
+  }
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    shownRisk += (risk - shownRisk) * Math.min(1, dt * 2.5);
+    const bpm = 62 + shownRisk * 58;            // purely illustrative speed
+    phase += dt * bpm / 60;
+    draw();
+    requestAnimationFrame(frame);
+  }
+  function setRisk(p) {
+    risk = p;
+    $('#ecgState').textContent = p < .3 ? 'Resting rhythm' : p < .6 ? 'Quickened rhythm' : 'Strained rhythm';
+    if (reduceMotion) { shownRisk = p; draw(); }
+  }
+  resize();
+  window.addEventListener('resize', () => { resize(); draw(); });
+  if (reduceMotion) draw(); else requestAnimationFrame(frame);
+  return { setRisk };
+})();
+
+/* ==========================================================================
+   3. Patient form (built from the schema returned by /api/metrics)
+   ========================================================================== */
+function buildForm(schema) {
+  const body = $('#formBody');
+  body.innerHTML = '';
+  const known = new Set(GROUPS.flatMap(g => g.fields));
+  const extra = schema.features.filter(f => !known.has(f));
+  const groups = GROUPS.map(g => ({ ...g, fields: g.fields.filter(f => schema.features.includes(f)) }));
+  if (extra.length) groups.push({ title: 'Other', fields: extra });
+
+  for (const g of groups) {
+    if (!g.fields.length) continue;
+    const wrap = document.createElement('div');
+    wrap.className = 'group';
+    wrap.innerHTML = `<h3>${g.title}</h3><div class="fields"></div>`;
+    const holder = $('.fields', wrap);
+    for (const name of g.fields) {
+      holder.appendChild(schema.numeric[name] ? numericField(name, schema.numeric[name]) : categoryField(name, schema.categorical[name]));
+    }
+    body.appendChild(wrap);
+  }
+  applyPreset('avg', false);
+}
+
+function numericField(name, spec) {
+  const span = spec.max - spec.min || 1;
+  const step = spec.step || 1;
+  const lo = Math.max(0, Math.floor(spec.min - span * 0.1));
+  const hi = Math.ceil(spec.max + span * 0.1);
+  const decimals = step < 1 ? 1 : 0;
+  const unit = UNITS[name] || '';
+  const f = document.createElement('div');
+  f.className = 'field';
+  f.innerHTML = `
+    <div class="field-head">
+      <label for="r-${name}">${nice(name)}</label>
+      <span class="numbox"><input id="n-${name}" type="number" inputmode="decimal" min="${lo}" max="${hi}" step="${step}" aria-label="${nice(name)} value"><em>${unit}</em></span>
+    </div>
+    <input id="r-${name}" type="range" min="${lo}" max="${hi}" step="${step}">
+    <div class="range-ends"><span>${lo}</span><span>${hi}</span></div>`;
+  const range = $('input[type=range]', f), box = $('input[type=number]', f);
+  const set = (v, fire = true) => {
+    v = Math.min(hi, Math.max(lo, Number(v)));
+    if (Number.isNaN(v)) return;
+    range.value = v; box.value = v.toFixed(decimals);
+    range.style.setProperty('--pct', ((v - lo) / (hi - lo) * 100) + '%');
+    state.values[name] = Number(v.toFixed(decimals));
+    if (fire) schedulePredict();
+  };
+  range.addEventListener('input', () => set(range.value));
+  box.addEventListener('change', () => set(box.value));
+  f.setValue = (v) => set(v, false);
+  f.dataset.field = name;
+  return f;
+}
+
+function categoryField(name, options) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  const showLabel = (o) => (o === '1' ? 'Yes' : o === '0' ? 'No' : o);
+  f.innerHTML = `<span class="lbl" id="l-${name}">${nice(name)}</span>
+    <div class="seg" role="radiogroup" aria-labelledby="l-${name}">
+      ${options.map(o => `<label><input type="radio" name="${name}" value="${o}"><span>${showLabel(o)}</span></label>`).join('')}
+    </div>`;
+  f.addEventListener('change', (e) => { state.values[name] = e.target.value; schedulePredict(); });
+  f.setValue = (v) => {
+    const input = [...f.querySelectorAll('input')].find(i => i.value === v);
+    if (input) { input.checked = true; state.values[name] = v; }
+  };
+  f.dataset.field = name;
+  return f;
+}
+
+// Example patients are derived from the data's own ranges, so they work for any dataset.
+function applyPreset(kind, fire = true) {
+  const s = state.schema;
+  const isYes = (o) => /^(yes|y|true|1)$/i.test(o);
+  for (const f of document.querySelectorAll('[data-field]')) {
+    const name = f.dataset.field;
+    if (s.numeric[name]) {
+      const { min, max, mean } = s.numeric[name];
+      const pos = { low: 0.2, high: 0.85, avg: null }[kind];
+      let v = pos === null ? mean : min + (max - min) * pos;
+      if (kind === 'low' && name === 'physical_activity') v = min + (max - min) * 0.85;
+      if (kind === 'high' && name === 'physical_activity') v = min + (max - min) * 0.1;
+      f.setValue(s.numeric[name].step >= 1 ? Math.round(v) : Math.round(v * 10) / 10);
+    } else {
+      const opts = s.categorical[name];
+      let pick = opts[0];
+      if (kind !== 'avg' && opts.some(isYes)) pick = opts.find(o => (kind === 'high') === isYes(o)) || opts[0];
+      if (name === 'sex') pick = opts.includes('Male') ? 'Male' : opts[0];
+      f.setValue(pick);
+    }
+  }
+  if (fire) schedulePredict();
+}
+
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+$('#form').addEventListener('submit', (e) => { e.preventDefault(); clearTimeout(state.timer); runPredict(); });
+
+/* ==========================================================================
+   4. Prediction call and result panel
+   ========================================================================== */
+function schedulePredict() {
+  clearTimeout(state.timer);
+  $('#resultPanel').classList.add('busy');
+  state.timer = setTimeout(runPredict, 300);   // wait until the slider stops moving
+}
+
+async function runPredict() {
+  const mine = ++state.seq;
+  try {
+    const res = await fetch(API + '/predict', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.values),
+    });
+    const data = await res.json();
+    if (mine !== state.seq) return;                  // a newer request replaced this one
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'The API did not accept these values.');
+    showResult(data);
+  } catch (err) {
+    if (mine !== state.seq) return;
+    const offline = err instanceof TypeError;
+    showError(offline ? `Can't reach the API at ${API}. Start it with uvicorn backend.main:app --reload, or check your deployment.` : err.message);
+  } finally {
+    if (mine === state.seq) $('#resultPanel').classList.remove('busy');
+  }
+}
+
+const RISK_COPY = {
+  low: ['Low risk', 'Below the 30% band. The model sees little in these values that points to heart disease.'],
+  moderate: ['Moderate risk', 'Between 30% and 60%. These values deserve a closer clinical look.'],
+  high: ['High risk', 'Above 60%. A clinician should review this patient.'],
+};
+const ICONS = {
+  low: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>',
+  moderate: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l8 14H2L10 3z"/><path d="M10 8.5v3.5M10 14.6v.1"/></svg>',
+  high: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4.6M10 13.6v.1"/></svg>',
+};
+const GAUGE_COLOR = { low: '#17714A', moderate: '#B7791F', high: '#B3243F' };
+let shownPct = 0;
+
+function showResult(r) {
+  $('#resultErr').classList.remove('show');
+  const p = r.probability, level = r.risk_level;
+  $('#gFill').setAttribute('stroke-dasharray', `${(p * 100).toFixed(2)} 100`);
+  $('#gFill').style.stroke = GAUGE_COLOR[level];
+  tween($('#gNum'), shownPct, p * 100, v => v.toFixed(1) + '%');
+  shownPct = p * 100;
+
+  const chip = $('#riskChip');
+  chip.className = 'risk-chip ' + level;
+  chip.innerHTML = ICONS[level] + RISK_COPY[level][0];
+  $('#riskText').textContent = RISK_COPY[level][1];
+
+  $('#pYes').textContent = pct(r.probabilities.heart_disease);
+  $('#pNo').textContent = pct(r.probabilities.no_heart_disease);
+  $('#bYes').style.width = pct(r.probabilities.heart_disease, 2);
+  $('#bNo').style.width = pct(r.probabilities.no_heart_disease, 2);
+  $('#verdict').innerHTML = `Model prediction: <b>${r.prediction ? 'heart disease' : 'no heart disease'}</b> (class ${r.prediction}), from a ${r.model} model.`;
+  ecg.setRisk(p);
+}
+
+function showError(msg) {
+  const e = $('#resultErr');
+  e.textContent = msg;
+  e.classList.add('show');
+}
+
+/* ==========================================================================
+   5. Model performance section
+   ========================================================================== */
+const METRIC_INFO = [
+  ['accuracy', 'Accuracy', 'Patients classified correctly, out of everyone tested.'],
+  ['precision', 'Precision', 'When the model flags heart disease, how often it is right.'],
+  ['recall', 'Recall', 'Share of real heart-disease cases the model catches.'],
+  ['f1', 'F1-score', 'A single score that balances precision and recall.'],
+  ['roc_auc', 'ROC-AUC', 'How well the model ranks sick patients above healthy ones. 0.5 is a coin flip.'],
+];
+
+function renderPerformance(m) {
+  const body = $('#perfBody');
+  const ds = m.dataset, mm = m.metrics, cm = m.confusion_matrix;
+  $('#perfSub').textContent = `Scores come from ${ds.test_rows} patients held back from training (${ds.train_rows} were used to train).`;
+
+  body.innerHTML = `
+    <div class="metric-grid">${METRIC_INFO.map(([k, name, tip]) => `
+      <article class="metric">
+        <h3>${name}</h3>
+        <div class="val">${pct(mm[k])}</div>
+        <div class="bar" role="img" aria-label="${name} ${pct(mm[k])}"><i data-w="${pct(mm[k], 2)}"></i></div>
+        <p>${tip}</p>
+      </article>`).join('')}
+    </div>
+    <div class="note" id="perfNote">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3l8 14H2L10 3z"/><path d="M10 8.5v3.5M10 14.6v.1"/></svg>
+      <div><b>Read these scores with care</b><p id="perfNoteText"></p></div>
+    </div>
+    <div class="charts">
+      <section class="panel" aria-labelledby="cmT">
+        <div class="chart-title"><h2 id="cmT">Confusion matrix</h2><p class="sub">Rows are the true diagnosis, columns are what the model predicted. Hover or tap a cell.</p></div>
+        <div id="cm"></div>
+      </section>
+      <section class="panel" aria-labelledby="rocT">
+        <div class="chart-title"><h2 id="rocT">ROC curve</h2><p class="sub">Each point is one decision threshold. A curve hugging the dashed line is no better than guessing.</p></div>
+        <div id="roc"></div>
+      </section>
+      <section class="panel" aria-labelledby="impT">
+        <div class="chart-title"><h2 id="impT">What the model relies on</h2><p class="sub">Share of the model's decisions that each measurement accounts for.</p></div>
+        <div class="imp" id="imp"></div>
+      </section>
+      <section class="panel" aria-labelledby="modT">
+        <div class="chart-title"><h2 id="modT">Model details</h2><p class="sub">How the model was chosen and trained.</p></div>
+        <dl class="details" id="details"></dl>
+        <table class="cand" id="cand"></table>
+      </section>
+    </div>`;
+
+  // Animate the progress bars once, after they are in the page.
+  requestAnimationFrame(() => requestAnimationFrame(() => body.querySelectorAll('.bar i[data-w]').forEach(i => i.style.width = i.dataset.w)));
+
+  renderMatrix(cm, ds);
+  renderRoc(m);
+  renderImportance(m.feature_importance);
+  renderDetails(m);
+
+  // Honest warning when the model is near chance level.
+  if (mm.roc_auc < 0.6) {
+    $('#perfNote').classList.add('show');
+    $('#perfNoteText').textContent =
+      `A ROC-AUC of ${mm.roc_auc.toFixed(2)} is close to 0.5, the score of random guessing, so on this dataset the model cannot reliably separate patients with and without heart disease. ` +
+      `With only ${ds.test_rows} test patients, each score can also shift by about 10 percentage points. Treat predictions as a demonstration of the pipeline, not as clinical evidence.`;
+    const c = $('#resultCaution');
+    c.textContent = `Heads up: this model scores ${mm.roc_auc.toFixed(2)} ROC-AUC on its test patients (0.5 is chance), so this estimate is for demonstration only.`;
+    c.classList.add('show');
+  }
+}
+
+function renderMatrix(cm, ds) {
+  const [[tn, fp], [fn, tp]] = cm.matrix;
+  const max = Math.max(tn, fp, fn, tp, 1), total = tn + fp + fn + tp;
+  const rowTotals = [tn + fp, fn + tp];
+  const cells = [
+    { id: 'tn', n: tn, name: 'True negative', row: 0, text: n => `${n} patients without heart disease were correctly cleared.` },
+    { id: 'fp', n: fp, name: 'False alarm', row: 0, text: n => `${n} patients without heart disease were flagged by mistake (false alarms).` },
+    { id: 'fn', n: fn, name: 'Missed case', row: 1, text: n => `${n} patients with heart disease were missed by the model.` },
+    { id: 'tp', n: tp, name: 'True positive', row: 1, text: n => `${n} patients with heart disease were correctly flagged.` },
+  ];
+  const cell = (c) => {
+    const t = c.n / max, dark = t > 0.5;
+    const share = rowTotals[c.row] ? c.n / rowTotals[c.row] : 0;
+    return `<td><button type="button" class="cell" data-id="${c.id}" style="background:${mix('#E3F1F2', '#0B5058', t)};color:${dark ? '#fff' : '#0E2A3B'}"
+      aria-label="${c.name}: ${c.n} patients, ${pct(share, 0)} of actual ${c.row ? 'positives' : 'negatives'}">
+      <span class="n">${c.n}</span><span class="k">${c.name}</span><span class="p">${pct(share, 0)} of row</span></button></td>`;
+  };
+  $('#cm').innerHTML = `
+    <table class="cm">
+      <caption class="sr">Confusion matrix of true versus predicted diagnosis</caption>
+      <thead><tr><td></td><th scope="col">Predicted: No</th><th scope="col">Predicted: Yes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Actual: No</th>${cell(cells[0])}${cell(cells[1])}</tr>
+        <tr><th scope="row">Actual: Yes</th>${cell(cells[2])}${cell(cells[3])}</tr>
+      </tbody>
+    </table>
+    <p class="cm-detail" id="cmDetail" aria-live="polite"></p>`;
+  const detail = $('#cmDetail');
+  const idle = `Out of ${total} test patients, the model missed ${fn} cases of heart disease and raised ${fp} false alarms.`;
+  detail.textContent = idle;
+  const show = (c) => { detail.textContent = c.text(c.n); };
+  document.querySelectorAll('#cm .cell').forEach(btn => {
+    const c = cells.find(x => x.id === btn.dataset.id);
+    btn.addEventListener('mouseenter', () => show(c));
+    btn.addEventListener('focus', () => show(c));
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cm .cell').forEach(b => b.classList.toggle('on', b === btn));
+      show(c);
+    });
+    btn.addEventListener('mouseleave', () => {
+      const active = $('#cm .cell.on');
+      detail.textContent = active ? cells.find(x => x.id === active.dataset.id).text(cells.find(x => x.id === active.dataset.id).n) : idle;
+    });
+  });
+}
+
+function renderRoc(m) {
+  const { fpr, tpr } = m.roc_curve, auc = m.metrics.roc_auc;
+  const W = 440, H = 380, ml = 50, mr = 16, mt = 12, mb = 50, iw = W - ml - mr, ih = H - mt - mb;
+  const X = v => ml + v * iw, Y = v => mt + (1 - v) * ih;
+  const ticks = [0, .25, .5, .75, 1];
+  const line = fpr.map((f, i) => `${i ? 'L' : 'M'}${X(f).toFixed(1)} ${Y(tpr[i]).toFixed(1)}`).join('');
+  $('#roc').innerHTML = `
+    <svg class="roc" viewBox="0 0 ${W} ${H}" role="img" aria-label="ROC curve. Area under the curve is ${auc.toFixed(2)}; a diagonal line would mean random guessing.">
+      ${ticks.map(t => `<line class="grid" x1="${X(t)}" y1="${Y(0)}" x2="${X(t)}" y2="${Y(1)}"/><line class="grid" x1="${X(0)}" y1="${Y(t)}" x2="${X(1)}" y2="${Y(t)}"/>
+        <text x="${X(t)}" y="${Y(0) + 18}" text-anchor="middle">${t}</text><text x="${X(0) - 9}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`).join('')}
+      <path class="area" d="${line}L${X(1)} ${Y(0)}L${X(0)} ${Y(0)}Z"/>
+      <line class="diag" x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(1)}"/>
+      <path class="curve" d="${line}"/>
+      <text class="auc" x="${X(.97)}" y="${Y(.1)}" text-anchor="end">AUC ${auc.toFixed(2)}</text>
+      <text class="axis-t" x="${X(.5)}" y="${H - 8}" text-anchor="middle">False-positive rate</text>
+      <text class="axis-t" transform="translate(13 ${Y(.5)}) rotate(-90)" text-anchor="middle">True-positive rate</text>
+      <g id="rocHover" style="display:none"><line id="rocV" class="diag" style="stroke-dasharray:3 3" y1="${Y(0)}" y2="${Y(1)}"/><circle id="rocDot" r="5.5" fill="#fff" stroke="#0F7F86" stroke-width="2.5"/></g>
+      <rect id="rocHit" x="${ml}" y="${mt}" width="${iw}" height="${ih}" fill="transparent"/>
+    </svg>`;
+  const svg = $('#roc svg'), hit = $('#rocHit'), g = $('#rocHover'), dot = $('#rocDot'), v = $('#rocV'), tip = $('#tip');
+  const move = (e) => {
+    const r = svg.getBoundingClientRect(), scale = W / r.width;
+    const fx = Math.min(1, Math.max(0, ((e.clientX - r.left) * scale - ml) / iw));
+    let idx = 0, best = 9;
+    fpr.forEach((f, i) => { const d = Math.abs(f - fx); if (d < best) { best = d; idx = i; } });
+    g.style.display = '';
+    dot.setAttribute('cx', X(fpr[idx])); dot.setAttribute('cy', Y(tpr[idx]));
+    v.setAttribute('x1', X(fpr[idx])); v.setAttribute('x2', X(fpr[idx]));
+    tip.hidden = false;
+    tip.innerHTML = `<b>False-positive rate</b> ${pct(fpr[idx])}<br><b>True-positive rate</b> ${pct(tpr[idx])}`;
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(innerWidth - tw - 8, e.clientX + 14) + 'px';
+    tip.style.top = Math.max(8, e.clientY - 56) + 'px';
+  };
+  const leave = () => { g.style.display = 'none'; tip.hidden = true; };
+  hit.addEventListener('pointermove', move);
+  hit.addEventListener('pointerdown', move);
+  hit.addEventListener('pointerleave', leave);
+}
+
+function renderImportance(items) {
+  const top = Math.max(...items.map(i => i.importance), 0.001);
+  $('#imp').innerHTML = items.map(i => `
+    <div class="imp-row"><span>${nice(i.feature)}</span>
+      <div class="bar"><i data-w="${(i.importance / top * 100).toFixed(1)}%"></i></div>
+      <b>${pct(i.importance, 0)}</b></div>`).join('');
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('#imp .bar i').forEach(i => i.style.width = i.dataset.w)));
+}
+
+function renderDetails(m) {
+  const ds = m.dataset, md = m.model, cv = md.cv_scores.roc_auc;
+  const params = Object.entries(md.best_params).map(([k, v]) => [k.replace(/_/g, ' '), v === null ? 'none' : v]);
+  const rows = [
+    ['Algorithm', md.name],
+    ...params.map(([k, v]) => [k.charAt(0).toUpperCase() + k.slice(1), v]),
+    ['Training patients', ds.train_rows],
+    ['Test patients', ds.test_rows],
+    ['Patients with heart disease', `${ds.class_counts.yes} of ${ds.rows} (${pct(ds.positive_rate, 0)})`],
+    [`${md.cv_folds}-fold cross-validated ROC-AUC`, `${cv.mean.toFixed(2)} ± ${cv.std.toFixed(2)}`],
+  ];
+  $('#details').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  $('#cand').innerHTML = `<thead><tr><th>Models compared</th><th>Cross-validated ROC-AUC</th></tr></thead><tbody>${
+    md.candidates.map(c => `<tr><td>${c.name}${c.name === md.name ? '<span class="tag">Selected</span>' : ''}</td><td>${c.cv_roc_auc.toFixed(3)}</td></tr>`).join('')}</tbody>`;
+}
+
+/* ==========================================================================
+   6. Start-up: check the API, load metrics, build the form
+   ========================================================================== */
+function setPill(kind, text) {
+  const p = $('#apiPill');
+  p.className = 'pill ' + kind;
+  p.lastElementChild.textContent = text;
+}
+
+async function boot() {
+  const [health, metrics] = await Promise.allSettled([
+    fetch(API + '/health').then(r => r.json()),
+    fetch(API + '/metrics').then(r => { if (!r.ok) throw new Error('metrics'); return r.json(); }),
+  ]);
+
+  const banner = $('#apiBanner');
+  if (health.status === 'fulfilled' && health.value.status === 'ok') setPill('ok', 'API online');
+  else if (health.status === 'fulfilled') setPill('bad', 'Model not trained');
+  else setPill('bad', 'API offline');
+
+  if (metrics.status === 'fulfilled') {
+    state.metrics = metrics.value;
+    state.schema = metrics.value.schema;
+    const ds = metrics.value.dataset;
+    $('#heroText').textContent = `Enter a patient's clinical measurements and get the estimated probability of heart disease from a ${metrics.value.model.name} model trained on ${ds.rows} hospital records.`;
+    const facts = $('#facts');
+    facts.hidden = false;
+    facts.innerHTML = [[ds.rows, 'patient records'], [metrics.value.schema.features.length, 'measurements'], [pct(metrics.value.metrics.roc_auc, 0), 'ROC-AUC on test data']]
+      .map(([v, k]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  } else {
+    state.schema = FALLBACK_SCHEMA;
+    banner.innerHTML = `Can't load the model from <code>${API}</code>. Run <code>python train.py</code>, then start the API with <code>uvicorn backend.main:app --reload</code> and open <code>http://localhost:8000</code>.`;
+    banner.classList.add('show');
+    $('#perfBody').innerHTML = `<div class="empty">Model results are not available yet. Run <code>python train.py</code> to create <code>model.pkl</code> and <code>metrics.json</code>, then reload this page.</div>`;
+  }
+
+  buildForm(state.schema);
+  if (state.metrics) renderPerformance(state.metrics);
+  runPredict();
+}
+boot();
+</script>
+</body>
+</html>

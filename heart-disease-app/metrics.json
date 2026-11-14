@@ -1,0 +1,324 @@
+{
+  "generated_at": "2026-11-14T20:32:25+00:00",
+  "sklearn_version": "1.9.1",
+  "model": {
+    "name": "Gradient Boosting",
+    "best_params": {
+      "learning_rate": 0.05,
+      "max_depth": 3,
+      "n_estimators": 200
+    },
+    "candidates": [
+      {
+        "name": "Random Forest",
+        "cv_roc_auc": 0.5247,
+        "best_params": {
+          "max_depth": 6,
+          "min_samples_leaf": 3,
+          "n_estimators": 200
+        }
+      },
+      {
+        "name": "Gradient Boosting",
+        "cv_roc_auc": 0.5667,
+        "best_params": {
+          "learning_rate": 0.05,
+          "max_depth": 3,
+          "n_estimators": 200
+        }
+      }
+    ],
+    "cv_folds": 5,
+    "cv_scores": {
+      "accuracy": {
+        "mean": 0.55,
+        "std": 0.0177
+      },
+      "precision": {
+        "mean": 0.5712,
+        "std": 0.0078
+      },
+      "recall": {
+        "mean": 0.6204,
+        "std": 0.0813
+      },
+      "f1": {
+        "mean": 0.5923,
+        "std": 0.0398
+      },
+      "roc_auc": {
+        "mean": 0.5667,
+        "std": 0.0134
+      }
+    },
+    "threshold": 0.5
+  },
+  "dataset": {
+    "source": "hospital_synthetic_dataset.xlsx",
+    "rows": 500,
+    "train_rows": 400,
+    "test_rows": 100,
+    "class_counts": {
+      "no": 234,
+      "yes": 266
+    },
+    "positive_rate": 0.532
+  },
+  "metrics": {
+    "accuracy": 0.55,
+    "precision": 0.5625,
+    "recall": 0.6792,
+    "f1": 0.6154,
+    "roc_auc": 0.5275
+  },
+  "confusion_matrix": {
+    "labels": [
+      "No heart disease",
+      "Heart disease"
+    ],
+    "matrix": [
+      [
+        19,
+        28
+      ],
+      [
+        17,
+        36
+      ]
+    ],
+    "tn": 19,
+    "fp": 28,
+    "fn": 17,
+    "tp": 36
+  },
+  "roc_curve": {
+    "fpr": [
+      0.0,
+      0.0,
+      0.0426,
+      0.0426,
+      0.1064,
+      0.1064,
+      0.1277,
+      0.1277,
+      0.1915,
+      0.1915,
+      0.2128,
+      0.2128,
+      0.234,
+      0.234,
+      0.2553,
+      0.2553,
+      0.2766,
+      0.2766,
+      0.3191,
+      0.3191,
+      0.3617,
+      0.3617,
+      0.383,
+      0.383,
+      0.4255,
+      0.4255,
+      0.4894,
+      0.4894,
+      0.5106,
+      0.5106,
+      0.5319,
+      0.5319,
+      0.5745,
+      0.5745,
+      0.5957,
+      0.5957,
+      0.6383,
+      0.6383,
+      0.7872,
+      0.7872,
+      0.8298,
+      0.8298,
+      0.8511,
+      0.8511,
+      0.8723,
+      0.8723,
+      0.9574,
+      0.9574,
+      1.0,
+      1.0
+    ],
+    "tpr": [
+      0.0,
+      0.0189,
+      0.0189,
+      0.0566,
+      0.0566,
+      0.0755,
+      0.0755,
+      0.1321,
+      0.1321,
+      0.1698,
+      0.1698,
+      0.283,
+      0.283,
+      0.3019,
+      0.3019,
+      0.3208,
+      0.3208,
+      0.3585,
+      0.3585,
+      0.4151,
+      0.4151,
+      0.434,
+      0.434,
+      0.4717,
+      0.4717,
+      0.5094,
+      0.5094,
+      0.5472,
+      0.5472,
+      0.566,
+      0.566,
+      0.5849,
+      0.5849,
+      0.6415,
+      0.6415,
+      0.717,
+      0.717,
+      0.7358,
+      0.7358,
+      0.8113,
+      0.8113,
+      0.8302,
+      0.8302,
+      0.9245,
+      0.9245,
+      0.9434,
+      0.9434,
+      0.9623,
+      0.9623,
+      1.0
+    ]
+  },
+  "feature_importance": [
+    {
+      "feature": "bmi",
+      "importance": 0.2673
+    },
+    {
+      "feature": "blood_pressure",
+      "importance": 0.2292
+    },
+    {
+      "feature": "cholesterol",
+      "importance": 0.1967
+    },
+    {
+      "feature": "age",
+      "importance": 0.1461
+    },
+    {
+      "feature": "physical_activity",
+      "importance": 0.0602
+    },
+    {
+      "feature": "stress_level",
+      "importance": 0.0496
+    },
+    {
+      "feature": "smoker",
+      "importance": 0.0179
+    },
+    {
+      "feature": "diabetes",
+      "importance": 0.0129
+    },
+    {
+      "feature": "sex",
+      "importance": 0.0101
+    },
+    {
+      "feature": "family_history",
+      "importance": 0.01
+    }
+  ],
+  "schema": {
+    "features": [
+      "age",
+      "sex",
+      "blood_pressure",
+      "cholesterol",
+      "bmi",
+      "smoker",
+      "diabetes",
+      "physical_activity",
+      "family_history",
+      "stress_level"
+    ],
+    "numeric": {
+      "age": {
+        "min": 30.0,
+        "max": 79.0,
+        "mean": 54.86,
+        "median": 55.0,
+        "integer": true,
+        "step": 1
+      },
+      "blood_pressure": {
+        "min": 90.0,
+        "max": 179.0,
+        "mean": 132.87,
+        "median": 132.0,
+        "integer": true,
+        "step": 1
+      },
+      "cholesterol": {
+        "min": 150.0,
+        "max": 299.0,
+        "mean": 221.5,
+        "median": 221.0,
+        "integer": true,
+        "step": 1
+      },
+      "bmi": {
+        "min": 18.1,
+        "max": 40.0,
+        "mean": 29.02,
+        "median": 29.2,
+        "integer": false,
+        "step": 0.1
+      },
+      "physical_activity": {
+        "min": 0.0,
+        "max": 4.0,
+        "mean": 2.05,
+        "median": 2.0,
+        "integer": true,
+        "step": 1
+      },
+      "stress_level": {
+        "min": 1.0,
+        "max": 9.0,
+        "mean": 4.88,
+        "median": 5.0,
+        "integer": true,
+        "step": 1
+      }
+    },
+    "categorical": {
+      "sex": [
+        "Female",
+        "Male"
+      ],
+      "smoker": [
+        "No",
+        "Yes"
+      ],
+      "diabetes": [
+        "No",
+        "Yes"
+      ],
+      "family_history": [
+        "No",
+        "Yes"
+      ]
+    }
+  }
+}
