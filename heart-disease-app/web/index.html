@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CardioScope - Heart disease risk screening</title>
+
+<!-- Installable web app (PWA) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0C2536">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CardioScope">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="description" content="Estimate a patient's probability of heart disease from clinical measurements, and see how well the model performs.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230C2536'/%3E%3Cpath d='M3 17h6l3-7 5 13 3-9 2 3h7' fill='none' stroke='%238EE3D8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,7 +65,7 @@ button, input { font: inherit; color: inherit; }
 /* ==========================================================================
    Hero (navy band with the ECG trace)
    ========================================================================== */
-.hero { background: var(--navy); color: #fff; padding-bottom: 96px; }
+.hero { background: var(--navy); color: #fff; padding-bottom: 96px; padding-top: env(safe-area-inset-top); }
 .nav { display: flex; align-items: center; gap: 28px; padding: 22px 0; }
 .brand { display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--font-display); letter-spacing: -.01em; color: #fff; text-decoration: none; }
 .brand svg { width: 30px; height: 30px; }
@@ -76,8 +85,19 @@ button, input { font: inherit; color: inherit; }
 .btn:active { transform: translateY(1px); }
 .btn-primary { background: #8EE3D8; color: #06323A; }
 .btn-primary:hover { background: #A6EDE3; }
-.btn-ghost { border-color: rgba(255,255,255,.28); color: #fff; }
+.btn-ghost { background: transparent; border-color: rgba(255,255,255,.28); color: #fff; }
 .btn-ghost:hover { background: rgba(255,255,255,.08); }
+.btn[hidden] { display: none; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* iPhone install instructions */
+dialog.sheet { width: min(420px, 100% - 32px); padding: 26px; border: 0; border-radius: 20px; background: #fff; color: var(--ink); box-shadow: 0 24px 60px rgba(8,24,36,.45); }
+dialog.sheet::backdrop { background: rgba(8,24,36,.55); }
+dialog.sheet h2 { font: 700 22px/1.2 var(--font-display); }
+dialog.sheet ol { margin: 16px 0 22px; padding-left: 22px; color: var(--ink-2); display: grid; gap: 10px; }
+dialog.sheet ol b { color: var(--ink); }
+dialog.sheet .btn { width: 100%; }
+
 .facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 36px; }
 .facts div { display: flex; flex-direction: column; }
 .facts dt { font-size: 14px; color: #8FA7B6; order: 2; }
@@ -307,6 +327,10 @@ footer a { color: var(--brand-dark); }
         <div class="actions">
           <a class="btn btn-primary" href="#predict">Estimate a patient's risk</a>
           <a class="btn btn-ghost" href="#performance">See model performance</a>
+          <button type="button" class="btn btn-ghost" id="installBtn" hidden>
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M4 15.5h12"/></svg>
+            Install app
+          </button>
         </div>
         <dl class="facts" id="facts" hidden></dl>
       </div>
@@ -389,6 +413,17 @@ footer a { color: var(--brand-dark); }
 </footer>
 
 <div class="tip" id="tip" role="tooltip" hidden></div>
+
+<!-- Shown on iPhone/iPad, where Safari has no install button of its own -->
+<dialog class="sheet" id="iosDialog" aria-labelledby="iosTitle">
+  <h2 id="iosTitle">Install on iPhone or iPad</h2>
+  <ol>
+    <li>Open this page in <b>Safari</b>.</li>
+    <li>Tap the <b>Share</b> button at the bottom of the screen.</li>
+    <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+  </ol>
+  <button type="button" class="btn btn-solid" id="iosClose">Got it</button>
+</dialog>
 
 <script>
 /* ==========================================================================
@@ -644,8 +679,12 @@ async function runPredict() {
     showResult(data);
   } catch (err) {
     if (mine !== state.seq) return;
-    const offline = err instanceof TypeError;
-    showError(offline ? `Can't reach the API at ${API}. Start it with uvicorn backend.main:app --reload, or check your deployment.` : err.message);
+    const unreachable = err instanceof TypeError;
+    showError(!navigator.onLine
+      ? "You're offline. Reconnect to get a new estimate."
+      : unreachable
+        ? `Can't reach the API at ${API}. Start it with uvicorn backend.main:app --reload, or check your deployment.`
+        : err.message);
   } finally {
     if (mine === state.seq) $('#resultPanel').classList.remove('busy');
   }
@@ -912,6 +951,49 @@ async function boot() {
   runPredict();
 }
 boot();
+
+/* ==========================================================================
+   7. Install as an app (PWA)
+   ========================================================================== */
+(() => {
+  const btn = $('#installBtn'), dialog = $('#iosDialog');
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let promptEvent = null;
+
+  // The service worker lets the app open offline. It needs https or localhost.
+  // Registered first so installed copies also receive updates.
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  if (standalone) return;                                   // already installed and running as an app
+
+  // Chrome, Edge and Samsung Internet (Android and desktop) offer a real install prompt.
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();                                     // keep it for our own button
+    promptEvent = e;
+    btn.hidden = false;
+  });
+  window.addEventListener('appinstalled', () => { btn.hidden = true; promptEvent = null; });
+
+  // Safari on iPhone/iPad has no prompt, so show the button and explain the steps.
+  if (isIOS) btn.hidden = false;
+
+  btn.addEventListener('click', async () => {
+    if (promptEvent) {
+      promptEvent.prompt();
+      await promptEvent.userChoice;
+      promptEvent = null;
+      btn.hidden = true;
+    } else if (dialog.showModal) {
+      dialog.showModal();
+    }
+  });
+  $('#iosClose').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+})();
 </script>
 </body>
 </html>

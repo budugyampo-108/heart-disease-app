@@ -1,0 +1,17 @@
+{
+  "name": "CardioScope - Heart disease risk screening",
+  "short_name": "CardioScope",
+  "description": "Estimate a patient's probability of heart disease and explore how well the model performs.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C2536",
+  "theme_color": "#0C2536",
+  "categories": ["medical", "health", "education"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
